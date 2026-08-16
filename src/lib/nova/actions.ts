@@ -95,60 +95,64 @@ ${languageLevel ? `- Yabancı Dil CEFR Seviyesi: "${languageLevel}" (A1-C2)` : "
 ${codingLanguage ? `- Programlama Dili: "${codingLanguage}"` : ""}
 `;
 
+    const isLanguageCategory = languageLevel || contentLanguage?.toLowerCase().includes("ingilizce") || contentLanguage?.toLowerCase().includes("english") || subjectName?.toLowerCase().includes("ingilizce") || subjectName?.toLowerCase().includes("almanca") || subjectName?.toLowerCase().includes("fransızca") || subjectName?.toLowerCase().includes("ispanyolca");
+
     const prompt = `
-Role: You are NOVA, an expert academic quiz engine.
-Task: Generate EXACTLY ${questionCount} multiple-choice questions for the following lesson content and curriculum context.
+Role: You are SYNAPSE NOVA, a world-class educational AI specialized in generating rigorous, authentic, and curriculum-aligned test questions.
+Task: Generate EXACTLY ${questionCount} unique, high-quality multiple-choice questions for the specified subject, level, and difficulty.
 
-Curriculum Context:
-- Country/System: ${countryName || "General"}
-- Grade/Level: ${gradeLevel}
-- Subject: ${subjectName || "General"}
-- Unit/Topic: ${computedTitle}
-- Difficulty: ${difficulty}
-- Language: ${contentLanguage}
+Context & Parameters:
+- Target Domain: ${countryName ? `${countryName} Curriculum` : "Specialized Subject"}
+- Grade / Level: ${gradeLevel}
+- Subject / Branch: ${subjectName || "Academic"}
+- Specific Topic / Focus: ${computedTitle}
+- Difficulty Level: ${difficulty}
+- Target CEFR Language Level: ${languageLevel || "N/A"}
+${codingLanguage ? `- Target Programming Language: ${codingLanguage}` : ""}
 
-Source Material:
+Content Material / Reference:
 """
 ${sanitizedContext}
 """
 
-Rules:
-1. Provide EXACTLY ${questionCount} questions in the "questions" array.
-2. Each question must have 4 options (A, B, C, D) with exactly one isCorrect: true.
-3. Include a concise pedagogical "hint" and step-by-step "explanation".
-4. Output valid JSON matching the schema below without extra markdown fences.
+STRICT GENERATION GUIDELINES:
+1. NO DUMMY OR TEMPLATE PLACEHOLDERS: Generate completely authentic, context-specific questions with real problem statements, formulas, code snippets, or passage comprehension.
+${isLanguageCategory ? `2. LANGUAGE LEARNING MODE: Questions, passages, and options MUST be written in the authentic TARGET language according to CEFR level (${languageLevel || "B1-B2"}), testing real grammar, vocabulary, sentence completion, and reading comprehension.` : `2. QUESTIONS DIVERSITY: Cover different cognitive levels (definition, application, problem solving, analysis) with unique plausible distractors.`}
+3. OPTIONS: Provide exactly 4 options (A, B, C, D) per question. Only ONE option must have isCorrect: true, others must have isCorrect: false.
+4. PEDAGOGY: Provide an insightful "hint" and a thorough step-by-step "explanation" explaining why the correct answer is right and why distractors are wrong.
+5. OUTPUT: Return strictly valid JSON following the schema below without markdown backticks or extra commentary.
 
 JSON Schema:
 {
   "title": "${computedTitle}",
-  "summary": "1-2 sentence core concept summary",
+  "summary": "1-2 sentence concise pedagogical overview of the topic",
   "gradeLevel": "${gradeLevel}",
   "difficulty": "${difficulty}",
   "questions": [
     {
       "id": 1,
-      "question": "Question text here?",
+      "question": "Full authentic question text?",
       "options": [
-        { "id": "A", "text": "Option A", "isCorrect": true },
-        { "id": "B", "text": "Option B", "isCorrect": false },
-        { "id": "C", "text": "Option C", "isCorrect": false },
-        { "id": "D", "text": "Option D", "isCorrect": false }
+        { "id": "A", "text": "Option A text", "isCorrect": true },
+        { "id": "B", "text": "Option B text", "isCorrect": false },
+        { "id": "C", "text": "Option C text", "isCorrect": false },
+        { "id": "D", "text": "Option D text", "isCorrect": false }
       ],
-      "hint": "Pedagogical clue",
-      "explanation": "Detailed explanation",
-      "topic": "${subjectName || "Core Topic"}"
+      "hint": "Pedagogical hint guiding thinking process",
+      "explanation": "Detailed step-by-step solution and analysis",
+      "topic": "${subjectName || "Subject Topic"}"
     }
   ]
 }
 `;
 
     const ai = getAiClient();
-    // Prioritize fast gemini-1.5-flash, gemini-2.5-flash, and fallbacks
-    const modelsToTry = ["gemini-1.5-flash", "gemini-2.5-flash", "gemini-flash-latest", "gemini-1.5-pro"];
+    // Prioritize gemini-1.5-pro, gemini-1.5-flash, gemini-2.5-flash
+    const modelsToTry = ["gemini-1.5-pro", "gemini-1.5-flash", "gemini-2.5-flash", "gemini-flash-latest"];
     let lastError = "";
 
-    // Maximum 20 seconds timeout guard for Serverless stability
-    const TIMEOUT_MS = 20000;
+    // 25s Timeout guard
+    const TIMEOUT_MS = 25000;
 
     for (const model of modelsToTry) {
       try {
@@ -157,11 +161,12 @@ JSON Schema:
           contents: prompt,
           config: {
             responseMimeType: "application/json",
+            temperature: 0.8,
           },
         });
 
         const timeoutPromise = new Promise<never>((_, reject) => {
-          setTimeout(() => reject(new Error("Zaman aşımı (20s timeout).")), TIMEOUT_MS);
+          setTimeout(() => reject(new Error("Zaman aşımı (Timeout).")), TIMEOUT_MS);
         });
 
         const response: any = await Promise.race([generationPromise, timeoutPromise]);
@@ -179,41 +184,20 @@ JSON Schema:
           return { success: true, data: parsed };
         }
       } catch (mErr: any) {
-        console.warn(`Model ${model} error or timeout:`, mErr.message);
+        console.warn(`Model ${model} error:`, mErr.message);
         lastError = mErr.message;
       }
     }
 
-    // 3. Fallback: High quality instant curriculum question synthesis to never block student
-    const fallbackQuestions: GeneratedQuestion[] = Array.from({ length: Math.min(questionCount, 5) }, (_, i) => ({
-      id: i + 1,
-      question: `${computedTitle} konusu ile ilgili ${i + 1}. kazanım sorusu: Aşağıdaki ifadelerden hangisi temel prensiplere uygundur?`,
-      options: [
-        { id: "A", text: `${computedTitle} temel kural ve formülleri doğru uygulanmıştır.`, isCorrect: true },
-        { id: "B", text: "Kavram tanımı eksik verilmiştir.", isCorrect: false },
-        { id: "C", text: "Verilen parametreler sonuca etki etmez.", isCorrect: false },
-        { id: "D", text: "Tüm durumlarda geçerli olmayan özel bir durumdur.", isCorrect: false },
-      ],
-      hint: "Konunun ana tanımını ve temel formül adımlarını gözden geçirin.",
-      explanation: `${computedTitle} konusunda A seçeneğinde belirtilen kural doğrudan müfredat kazanımıyla örtüşmektedir.`,
-      topic: subjectName || "Kazanım Analizi",
-    }));
-
     return {
-      success: true,
-      data: {
-        title: computedTitle,
-        summary: `${computedTitle} konusuna ait temel kavramlar ve kazanım pekiştirme testi.`,
-        gradeLevel,
-        difficulty,
-        questions: fallbackQuestions,
-      },
+      success: false,
+      error: `Yapay zeka soru üretiminde bir sorun oluştu (${lastError || "Geçersiz yanıt"}). Lütfen konuyu veya soru sayısını düzenleyip tekrar deneyin.`,
     };
   } catch (error: any) {
     console.error("NOVA Generation Action Error:", error);
     return {
       success: false,
-      error: `Test oluşturulurken zaman aşımı oluştu. Lütfen soru sayısını azaltıp tekrar deneyin (${error.message}).`,
+      error: `Yapay zeka soru üretimi başarısız oldu: ${error.message || "Bilinmeyen hata"}. Lütfen tekrar deneyin.`,
     };
   }
 }
