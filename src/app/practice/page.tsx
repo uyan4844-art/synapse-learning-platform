@@ -301,10 +301,10 @@ export default function PracticePage() {
           setSelectedAnswers({});
           setQuizFinished(false);
           setDiagnostic(null);
-        }, 400);
+        }, 300);
       } else {
         setIsProcessing(false);
-        setGenerationError(res.error || (locale === "en" ? "Test generation timed out. Please try again." : "Test oluşturulurken zaman aşımı oluştu. Lütfen soru sayısını azaltıp tekrar deneyin."));
+        setGenerationError(res.error || (locale === "en" ? "Test generation timed out. Please try reducing question count." : "Test oluşturulurken zaman aşımı oluştu. Lütfen soru sayısını azaltıp tekrar deneyin."));
       }
     } catch (err: any) {
       clearInterval(interval);
@@ -312,6 +312,10 @@ export default function PracticePage() {
       setGenerationError(err.message || (locale === "en" ? "Unexpected error while generating quiz." : "Test oluşturulurken zaman aşımı oluştu. Lütfen soru sayısını azaltıp tekrar deneyin."));
     } finally {
       clearInterval(interval);
+      // Failsafe: Ensure isProcessing never hangs after 21 seconds
+      setTimeout(() => {
+        setIsProcessing(false);
+      }, 500);
     }
   };
 

@@ -47,24 +47,32 @@ export async function generateNovaQuizAction(params: {
     let contextText = urlOrTopic;
     let computedTitle = topicTitle || subjectName || specificUnitOrTopic || urlOrTopic.slice(0, 50);
 
-    // 1. Process specific input modalities
-    if (sourceType === "youtube" || urlOrTopic.includes("youtube.com") || urlOrTopic.includes("youtu.be")) {
-      const transcriptResult = await getRealYouTubeTranscript(urlOrTopic);
-      if (transcriptResult.source === "real_youtube_transcript" && transcriptResult.transcript) {
-        contextText = transcriptResult.transcript;
-        computedTitle = computedTitle.startsWith("http") ? `YouTube Dersi (${transcriptResult.videoId})` : computedTitle;
-      } else {
-        contextText = `YouTube Video / Ders Konusu: "${urlOrTopic}". İlgili dersin temel tanımları, formülleri ve soru tipleri.`;
+    // 1. Process specific input modalities with smart fallback to topic mode
+    const isExplicitYouTube = sourceType === "youtube" && (urlOrTopic.includes("youtube.com") || urlOrTopic.includes("youtu.be"));
+    
+    if (isExplicitYouTube) {
+      try {
+        const transcriptResult = await getRealYouTubeTranscript(urlOrTopic);
+        if (transcriptResult.source === "real_youtube_transcript" && transcriptResult.transcript) {
+          contextText = transcriptResult.transcript;
+          computedTitle = computedTitle.startsWith("http") ? `YouTube Dersi (${transcriptResult.videoId})` : computedTitle;
+        } else {
+          contextText = `Ders / Sınav Konusu: "${urlOrTopic}". İlgili dersin temel tanımları, kuralları ve örnek soru tipleri.`;
+        }
+      } catch {
+        contextText = `Ders / Sınav Konusu: "${urlOrTopic}". İlgili dersin temel tanımları, kuralları ve örnek soru tipleri.`;
       }
     } else if (sourceType === "pdf" && pdfRawText) {
       contextText = pdfRawText;
       computedTitle = topicTitle || "Yüklenen PDF Ders Notu";
-    } else if (sourceType === "text") {
+    } else if (sourceType === "text" && urlOrTopic) {
       contextText = urlOrTopic;
       computedTitle = topicTitle || "Özel Ders Metni & Notları";
-    } else if (sourceType === "topic") {
-      contextText = `Öğrenme Konusu: "${specificUnitOrTopic || subjectName || urlOrTopic}". Ders: ${subjectName || ""}, Kategori: ${subjectCategory || ""}.`;
-      computedTitle = specificUnitOrTopic || subjectName || urlOrTopic;
+    } else {
+      // Default: Academic, Language, Coding or Topic without transcript
+      const resolvedTopic = specificUnitOrTopic || subjectName || topicTitle || urlOrTopic || "Genel Kazanım Testi";
+      contextText = `Ders / Kazanım Odak Alanı: "${resolvedTopic}". ${subjectName ? `Ders: ${subjectName}.` : ""} ${gradeLevel ? `Seviye: ${gradeLevel}.` : ""} ${languageLevel ? `Dil CEFR Seviyesi: ${languageLevel}.` : ""} ${codingLanguage ? `Programlama Dili: ${codingLanguage}.` : ""}`;
+      computedTitle = resolvedTopic;
     }
 
     // Limit context length (first 15,000 chars)
