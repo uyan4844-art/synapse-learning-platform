@@ -88,59 +88,59 @@ ${codingLanguage ? `- Programlama Dili: "${codingLanguage}"` : ""}
 `;
 
     const prompt = `
-Sen SYNAPSE platformunun resmi NOVA Akıllı Öğrenme ve Soru Sentezleme Motorusun.
-Aşağıdaki ders materyaline ve müfredat parametrelerine dayanarak KESİNLİKLE TAM OLARAK ${questionCount} (Adet: ${questionCount}) adet pedagojik, çeldiricileri mantıklı ve yüksek kaliteli çoktan seçmeli soru üret.
+Role: You are NOVA, an expert academic quiz engine.
+Task: Generate EXACTLY ${questionCount} multiple-choice questions for the following lesson content and curriculum context.
 
-${academicContextMetadata}
+Curriculum Context:
+- Country/System: ${countryName || "General"}
+- Grade/Level: ${gradeLevel}
+- Subject: ${subjectName || "General"}
+- Unit/Topic: ${computedTitle}
+- Difficulty: ${difficulty}
+- Language: ${contentLanguage}
 
-DERS MATERYALİ / KAYNAK İÇERİK:
+Source Material:
 """
 ${sanitizedContext}
 """
 
-PARAMETRELER:
-- Konu / Başlık: "${computedTitle}"
-- Zorluk Derecesi: "${difficulty}"
-- Dil: "${contentLanguage}"
-- İstenen Soru Sayısı: ${questionCount}
+Rules:
+1. Provide EXACTLY ${questionCount} questions in the "questions" array.
+2. Each question must have 4 options (A, B, C, D) with exactly one isCorrect: true.
+3. Include a concise pedagogical "hint" and step-by-step "explanation".
+4. Output valid JSON matching the schema below without extra markdown fences.
 
-KURALLAR:
-1. questions dizisinde TAM OLARAK ${questionCount} adet soru nesnesi bulunmalıdır. Eksik veya fazla soru üretme.
-2. Her soru için 4 seçenek (A, B, C, D) belirle; yalnızca 1 tanesi doğru olsun (isCorrect: true).
-3. Her soruya pedagojik bir "hint" (cevabı doğrudan vermeyen, formülü veya düşünme adımını hatırlatan ipucu) ekle.
-4. "explanation" kısmında doğru cevabın çözüm adımlarını ve çeldirici şıkların mantığını detaylı anlat.
-5. Yanıtı YALNIZCA geçerli bir JSON nesnesi olarak döndür (markdown backtick vb. ekleme).
-
-JSON ŞEMASI:
+JSON Schema:
 {
   "title": "${computedTitle}",
-  "summary": "Bu ders içeriğinin 1-2 cümlelik temel pedagojik özeti ve ana kazanımları",
+  "summary": "1-2 sentence core concept summary",
   "gradeLevel": "${gradeLevel}",
   "difficulty": "${difficulty}",
   "questions": [
     {
       "id": 1,
-      "question": "Soru metni?",
+      "question": "Question text here?",
       "options": [
-        { "id": "A", "text": "Seçenek A", "isCorrect": true },
-        { "id": "B", "text": "Seçenek B", "isCorrect": false },
-        { "id": "C", "text": "Seçenek C", "isCorrect": false },
-        { "id": "D", "text": "Seçenek D", "isCorrect": false }
+        { "id": "A", "text": "Option A", "isCorrect": true },
+        { "id": "B", "text": "Option B", "isCorrect": false },
+        { "id": "C", "text": "Option C", "isCorrect": false },
+        { "id": "D", "text": "Option D", "isCorrect": false }
       ],
-      "hint": "Pedagojik ipucu",
-      "explanation": "Detaylı çözüm açıklaması",
-      "topic": "${subjectName || "Konu Kazanımı"}"
+      "hint": "Pedagogical clue",
+      "explanation": "Detailed explanation",
+      "topic": "${subjectName || "Core Topic"}"
     }
   ]
 }
 `;
 
     const ai = getAiClient();
-    const modelsToTry = ["gemini-2.5-flash", "gemini-flash-latest", "gemini-3.5-flash", "gemini-3.7-flash", "gemini-3.1-flash-lite"];
+    // Prioritize fast gemini-1.5-flash, gemini-2.5-flash, and fallbacks
+    const modelsToTry = ["gemini-1.5-flash", "gemini-2.5-flash", "gemini-flash-latest", "gemini-1.5-pro"];
     let lastError = "";
 
-    // Maximum 25 seconds timeout guard
-    const TIMEOUT_MS = 25000;
+    // Maximum 20 seconds timeout guard for Serverless stability
+    const TIMEOUT_MS = 20000;
 
     for (const model of modelsToTry) {
       try {
@@ -153,7 +153,7 @@ JSON ŞEMASI:
         });
 
         const timeoutPromise = new Promise<never>((_, reject) => {
-          setTimeout(() => reject(new Error("İstek zaman aşımına uğradı (25s timeout).")), TIMEOUT_MS);
+          setTimeout(() => reject(new Error("Zaman aşımı (20s timeout).")), TIMEOUT_MS);
         });
 
         const response: any = await Promise.race([generationPromise, timeoutPromise]);
@@ -178,7 +178,7 @@ JSON ŞEMASI:
 
     return {
       success: false,
-      error: `NOVA Soru Üretim Zaman Aşımı / Hatası: ${lastError || "Soru sentezlenemedi, lütfen tekrar deneyin."}`,
+      error: `Test oluşturulurken zaman aşımı oluştu veya model yanıt vermedi (${lastError}). Lütfen soru sayısını azaltıp tekrar deneyin.`,
     };
   } catch (error: any) {
     console.error("NOVA Generation Action Error:", error);

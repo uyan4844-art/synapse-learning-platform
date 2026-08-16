@@ -256,8 +256,20 @@ export default function PracticePage() {
       });
     }, 500);
 
+    // 20s Client-side Timeout Race Guard
+    const clientTimeoutPromise = new Promise<{ success: false; error: string }>((resolve) => {
+      setTimeout(() => {
+        resolve({
+          success: false,
+          error: locale === "en"
+            ? "Test generation timed out after 20 seconds. Please try reducing the question count and retry."
+            : "Test oluşturulurken zaman aşımı oluştu. Lütfen soru sayısını azaltıp tekrar deneyin.",
+        });
+      }, 20000);
+    });
+
     try {
-      const res = await generateNovaQuizAction({
+      const serverActionPromise = generateNovaQuizAction({
         sourceType,
         urlOrTopic: inputContent,
         topicTitle: titleToPass,
@@ -275,6 +287,8 @@ export default function PracticePage() {
         contentLanguage: locale === "en" ? "English" : "Türkçe",
       });
 
+      const res = await Promise.race([serverActionPromise, clientTimeoutPromise]);
+
       clearInterval(interval);
 
       if (res.success && res.data?.questions && res.data.questions.length > 0) {
@@ -287,15 +301,17 @@ export default function PracticePage() {
           setSelectedAnswers({});
           setQuizFinished(false);
           setDiagnostic(null);
-        }, 500);
+        }, 400);
       } else {
         setIsProcessing(false);
-        setGenerationError(res.error || (locale === "en" ? "Failed to generate questions. Please check your topic and try again." : "NOVA soruları oluşturamadı. Lütfen girdi materyalini kontrol edip tekrar deneyin."));
+        setGenerationError(res.error || (locale === "en" ? "Test generation timed out. Please try again." : "Test oluşturulurken zaman aşımı oluştu. Lütfen soru sayısını azaltıp tekrar deneyin."));
       }
     } catch (err: any) {
       clearInterval(interval);
       setIsProcessing(false);
-      setGenerationError(err.message || (locale === "en" ? "Unexpected error while generating quiz." : "Test üretilirken beklenmeyen bir hata oluştu."));
+      setGenerationError(err.message || (locale === "en" ? "Unexpected error while generating quiz." : "Test oluşturulurken zaman aşımı oluştu. Lütfen soru sayısını azaltıp tekrar deneyin."));
+    } finally {
+      clearInterval(interval);
     }
   };
 
