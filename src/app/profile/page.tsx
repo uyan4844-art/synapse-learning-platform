@@ -76,7 +76,7 @@ export default function ProfilePage() {
     );
   };
 
-  const handleSave = (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
       localStorage.setItem("synapse_display_name", displayName);
@@ -86,6 +86,22 @@ export default function ProfilePage() {
       localStorage.setItem("synapse_user_track", selectedTrack);
       localStorage.setItem("synapse_user_subgoals", JSON.stringify(selectedSubGoals));
       localStorage.setItem("synapse_user_daily_target", dailyTarget);
+
+      // Async sync to Supabase database if available
+      try {
+        const { updateProfileServerAction } = await import("@/lib/supabase/profile-actions");
+        await updateProfileServerAction({
+          display_name: displayName,
+          username: username,
+          country: countryCode,
+          grade: grade,
+          learning_track: selectedTrack,
+          sub_goals: selectedSubGoals,
+          daily_target: dailyTarget,
+        });
+      } catch {
+        // Fallback gracefully to client storage
+      }
     } catch {
       // ignore
     }

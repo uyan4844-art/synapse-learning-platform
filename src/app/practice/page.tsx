@@ -24,6 +24,7 @@ import {
 import { generateNovaQuizAction, analyzeQuizPerformanceAction, type IngestionSourceType } from "@/lib/nova/actions";
 import type { GeneratedQuestion, NovaDiagnosticResult } from "@/lib/nova/gemini-client";
 import { CustomStudySet, DEFAULT_CUSTOM_SETS, StudyMaterialType } from "@/types/study-sets";
+import type { QuizSessionRecord } from "@/types/progress";
 
 export default function PracticePage() {
   const { t, locale } = useTranslation();
@@ -314,6 +315,32 @@ export default function PracticePage() {
         wrongTopics.push(q.topic);
       }
     });
+
+    const calculatedAccuracy = Math.round((correctCount / totalQuestions) * 100);
+    const earnedXp = correctCount * 15;
+
+    // Save completed session to history
+    try {
+      const sessionRecord: QuizSessionRecord = {
+        id: `sess_${Date.now()}`,
+        subjectName: selectedSubject || "Matematik",
+        topicTitle: specificUnitTopic ? `${selectedSubject} - ${specificUnitTopic}` : (selectedSubject || "NOVA Pratik Seansı"),
+        category: activeCategory,
+        totalQuestions,
+        correctAnswers: correctCount,
+        scoreAccuracy: calculatedAccuracy,
+        earnedXp,
+        weakPoints: wrongTopics,
+        recommendation: wrongTopics.length > 0 ? `${wrongTopics.join(", ")} konuları üzerinde 5 soruluk odaklanmış pratik yapmanız önerilir.` : "Tebrikler! Konu kazanımlarına tam hakimiyet sağlandı.",
+        completedAt: new Date().toISOString(),
+      };
+
+      const existingSessionsStr = localStorage.getItem("synapse_quiz_sessions");
+      const existingSessions: QuizSessionRecord[] = existingSessionsStr ? JSON.parse(existingSessionsStr) : [];
+      localStorage.setItem("synapse_quiz_sessions", JSON.stringify([sessionRecord, ...existingSessions]));
+    } catch {
+      // ignore
+    }
 
     const res = await analyzeQuizPerformanceAction({
       quizTitle: selectedSubject || "NOVA Pratik Seansı",
