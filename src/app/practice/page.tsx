@@ -11,7 +11,7 @@ import {
   Youtube, FileText, Type, BookOpen, Sparkles, Loader2, Check,
   ArrowRight, HelpCircle, RefreshCw, Trophy, AlertCircle, PlayCircle,
   Upload, Code2, Globe2, Layers, Cpu, Compass, Plus, Trash2, Edit3,
-  Bookmark, FolderHeart, Calendar, CheckCircle2, Clock, School, Award
+  Bookmark, FolderHeart, Calendar, CheckCircle2, Clock, School, Award, RotateCcw
 } from "lucide-react";
 import { useTranslation } from "@/i18n/context";
 import {
@@ -1130,6 +1130,25 @@ export default function PracticePage() {
                     </select>
                   </div>
                 </div>
+
+                {generationError && (
+                  <div className="p-4 rounded-lg bg-destructive/15 border border-destructive/30 text-xs text-foreground flex flex-col sm:flex-row sm:items-center justify-between gap-3 animate-fade-in">
+                    <div className="flex items-center gap-2">
+                      <AlertCircle className="h-4 w-4 text-destructive shrink-0" />
+                      <span>{generationError}</span>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={handleStartGeneration}
+                      className="text-xs h-8 px-3 font-semibold shrink-0 gap-1.5 border-destructive/40 hover:bg-destructive/10"
+                    >
+                      <RotateCcw className="h-3.5 w-3.5" />
+                      {locale === "en" ? "Retry Now" : "Tekrar Dene"}
+                    </Button>
+                  </div>
+                )}
 
                 {isProcessing && (
                   <div className="p-5 rounded-lg bg-secondary border border-border space-y-3 animate-fade-in">

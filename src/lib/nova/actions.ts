@@ -136,18 +136,27 @@ JSON ŞEMASI:
 `;
 
     const ai = getAiClient();
-    const modelsToTry = ["gemini-3.5-flash", "gemini-flash-latest", "gemini-3.7-flash", "gemini-3.1-flash-lite"];
+    const modelsToTry = ["gemini-2.5-flash", "gemini-flash-latest", "gemini-3.5-flash", "gemini-3.7-flash", "gemini-3.1-flash-lite"];
     let lastError = "";
+
+    // Maximum 25 seconds timeout guard
+    const TIMEOUT_MS = 25000;
 
     for (const model of modelsToTry) {
       try {
-        const response = await ai.models.generateContent({
+        const generationPromise = ai.models.generateContent({
           model,
           contents: prompt,
           config: {
             responseMimeType: "application/json",
           },
         });
+
+        const timeoutPromise = new Promise<never>((_, reject) => {
+          setTimeout(() => reject(new Error("İstek zaman aşımına uğradı (25s timeout).")), TIMEOUT_MS);
+        });
+
+        const response: any = await Promise.race([generationPromise, timeoutPromise]);
 
         let rawText = response.text?.trim() || "";
         if (rawText.startsWith("```json")) {
@@ -162,14 +171,14 @@ JSON ŞEMASI:
           return { success: true, data: parsed };
         }
       } catch (mErr: any) {
-        console.warn(`Model ${model} error:`, mErr.message);
+        console.warn(`Model ${model} error or timeout:`, mErr.message);
         lastError = mErr.message;
       }
     }
 
     return {
       success: false,
-      error: `NOVA Soru Üretim Hatası: ${lastError || "Soru sentezlenemedi, lütfen tekrar deneyin."}`,
+      error: `NOVA Soru Üretim Zaman Aşımı / Hatası: ${lastError || "Soru sentezlenemedi, lütfen tekrar deneyin."}`,
     };
   } catch (error: any) {
     console.error("NOVA Generation Action Error:", error);
